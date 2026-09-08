@@ -4,13 +4,13 @@ A small coffee-ordering demo for a Frankfurt meetup. Plain Node.js, HTML, CSS, a
 
 ## Run
 
-Requires Node.js 22 or newer.
+Requires Node.js 20 or newer.
 
 ```bash
 npm start
 ```
 
-Open **http://localhost:3000**. Use `npm run dev` for automatic server restarts while editing, or `PORT=8080 npm start` for a different port. The server listens on all interfaces so it can be previewed from a remote workspace.
+Open **http://localhost:3000**. Use `npm run dev` for automatic server restarts while editing, or `APP_PORT=8080 npm start` for a different port. The app intentionally ignores the generic `PORT` variable because GitTerm reserves it for the workspace runtime. The server listens on all interfaces so it can be previewed remotely.
 
 ```bash
 npm test

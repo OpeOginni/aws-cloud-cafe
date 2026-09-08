@@ -54,6 +54,7 @@ export function createApp() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const port = Number(process.env.PORT || 3000);
+  // GitTerm reserves PORT for its own runtime, so this app uses APP_PORT.
+  const port = Number(process.env.APP_PORT || 3000);
   createApp().listen(port, '0.0.0.0', () => console.log(`Cloud Café → http://localhost:${port}`));
 }

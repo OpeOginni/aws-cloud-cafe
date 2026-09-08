@@ -6,3 +6,4 @@ node_modules/
 *.log
 PRESENTER.md
 *.pdf
+session-*.md
