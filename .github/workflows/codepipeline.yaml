@@ -1,0 +1,129 @@
+name: Cloud Café Pipeline Deployment
+
+on:
+  # Trigger on push to main branch
+  push:
+    branches: [main]
+    paths:
+      - 'lambda/**'
+      - 'application/**'
+      - 'sam.yaml'
+      - 'pipeline/**'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  STAGE: dev
+  S3_BUCKET: cloudcafe-artifacts-${{ env.AWS_REGION }}
+  CLOUDFRONT_DISTRIBUTION_ID: ''
+
+jobs:
+  pipeline-build:
+    name: Build and Deploy Pipeline
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Validate SAM template
+        run: sam validate --template-file sam.yaml
+      
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          cp sam.yaml deploy/
+          cp -r lambda deploy/
+          cd lambda
+          NPM_CONFIG_PRODUCTION=true npm pack --silent
+          cd ..
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+          role-to-assume: arn:aws:iam::539608377039:role/gitterm-task-development-eu-central-1
+      
+      - name: Upload artifacts to S3
+        run: |
+          aws s3 mb s3://cloudcafe-artifacts-${{ env.AWS_REGION }} --region eu-central-1
+          aws s3 cp deploy/sam.yaml s3://cloudcafe-artifacts-${{ env.AWS_REGION }}/sam.yaml
+          aws s3 cp deploy/lambda.zip s3://cloudcafe-artifacts-${{ env.AWS_REGION }}/lambda.zip
+          aws s3 cp deploy/application/ s3://cloudcafe-artifacts-${{ env.AWS_REGION }}/application/ --recursive
+      
+      - name: Package SAM template
+        run: |
+          sam package \
+            --template-file sam.yaml \
+            --s3-bucket cloudcafe-artifacts-${{ env.AWS_REGION }} \
+            --output-template-file packaged.yaml \
+            --region eu-central-1
+      
+      - name: Deploy to CloudFormation
+        run: |
+          aws cloudformation create-change-set \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --change-set-name pipeline-changeset-${{ github.sha }} \
+            --template-body file://packaged.yaml \
+            --change-set-type CREATE \
+            --parameters ParameterKey=Stage,ParameterValue=${{ env.STAGE }} \
+            --region eu-central-1
+      
+      - name: Wait for changeset ready
+        run: |
+          aws cloudformation wait changeset-create-complete \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --change-set-name pipeline-changeset-${{ github.sha }} \
+            --region eu-central-1
+      
+      - name: Execute changeset
+        run: |
+          aws cloudformation execute-change-set \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --change-set-name pipeline-changeset-${{ github.sha }} \
+            --region eu-central-1
+      
+      - name: Wait for deployment complete
+        run: |
+          aws cloudformation wait stack-update-complete \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --region eu-central-1 || aws cloudformation wait stack-create-complete \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --region eu-central-1
+      
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*" \
+            --region eu-central-1
+      
+      - name: Extract deployment outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudcafe-${{ env.STAGE }} \
+            --region eu-central-1 > deployment-output.json
+      
+      - name: Generate deployment report
+        run: |
+          echo "## 🚀 Cloud Café Pipeline Deployment Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Source Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pipeline Build ID:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed Stage:** ${{ env.STAGE }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          cat deployment-output.json | jq '.Stacks[0].Outputs[] | "  - **\(.OutputKey)**: \(.OutputValue)"' >> $GITHUB_STEP_SUMMARY

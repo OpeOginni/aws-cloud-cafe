@@ -1,0 +1,365 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS CodePipeline for Cloud Café deployment",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Pipeline Configuration"
+          },
+          "Parameters": [
+            "CodePipelineName",
+            "StageName",
+            "GitHubOwner",
+            "GitHubRepo",
+            "GitHubBranch"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Infrastructure Configuration"
+          },
+          "Parameters": [
+            "S3BucketName",
+            "CloudFrontDistributionId",
+            "LambdaExecutionRole"
+          ]
+        }
+      ]
+    }
+  },
+  "Parameters": {
+    "CodePipelineName": {
+      "Type": "String",
+      "Default": "CloudCafePipeline",
+      "Description": "Name of the CodePipeline"
+    },
+    "StageName": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "staging", "prod"],
+      "Description": "Deployment stage"
+    },
+    "GitHubOwner": {
+      "Type": "String",
+      "Default": "OpeOginni",
+      "Description": "GitHub repository owner"
+    },
+    "GitHubRepo": {
+      "Type": "String",
+      "Default": "aws-cloud-cafe",
+      "Description": "GitHub repository name"
+    },
+    "GitHubBranch": {
+      "Type": "String",
+      "Default": "main",
+      "Description": "GitHub branch to monitor"
+    },
+    "S3BucketName": {
+      "Type": "String",
+      "Description": "S3 bucket for deployment artifacts"
+    },
+    "CloudFrontDistributionId": {
+      "Type": "String",
+      "Description": "CloudFront distribution ID for cache invalidation"
+    },
+    "LambdaExecutionRole": {
+      "Type": "String",
+      "Default": "PricingLambdaServiceRole",
+      "Description": "Lambda execution role ARN"
+    }
+  },
+  "Conditions": {
+    "IsProduction": {"Equals": [{"Ref": "StageName"}, "prod"]}
+  },
+  "Resources": {
+    "PipelineRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "codepipeline.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSCodePipelineServiceRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "PipelineAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "AccessAllResources",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": "arn:aws:s3:::*"
+                },
+                {
+                  "Sid": "CloudFormation",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:UpdateStack",
+                    "cloudformation:CreateChangeSet",
+                    "cloudformation:ExecuteChangeSet"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "Lambda",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateAlias",
+                    "lambda:PutFunctionConcurrency"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudFront",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudfront:CreateInvalidation"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CodeBuild",
+                  "Effect": "Allow",
+                  "Action": [
+                    "codebuild:StartBuild",
+                    "codebuild:BatchGetBuilds"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "Monitoring",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BuildExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "codebuild.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BuildAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    "arn:aws:s3:::cloudcafe-artifacts-*",
+                    "arn:aws:s3:::cloudcafe-artifacts-*/*"
+                  ]
+                },
+                {
+                  "Sid": "CloudFormation",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:ValidateTemplate"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaPackaging",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:GetFunction",
+                    "lambda:GetFunctionConfiguration",
+                    "lambda:UpdateFunctionCode"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudFrontInvalidation",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudfront:CreateInvalidation"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "Monitoring",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogStreams"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BuildProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "CloudCafeBuild-${AWS::StackName}"
+        },
+        "Description": "Build and deploy Cloud Café application",
+        "ServiceRole": {"Fn::GetAtt": ["BuildExecutionRole", "Arn"]},
+        "Source": {
+          "Type": "S3",
+          "Location": {
+            "Fn::Sub": "s3://${S3BucketName}/sam.yaml"
+          }
+        },
+        "Artifacts": {
+          "Type": "S3"
+        },
+        "Environment": {
+          "Type": "linux-x86_64",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:6.0",
+          "PrivilegedMode": true,
+          "EnvironmentVariables": [
+            {
+              "Name": "STAGE",
+              "Value": {"Ref": "StageName"}
+            },
+            {
+              "Name": "AWS_DEFAULT_REGION",
+              "Value": {"Ref": "AWS::Region"}
+            },
+            {
+              "Name": "CLOUDFRONT_DISTRIBUTION_ID",
+              "Value": {"Ref": "CloudFrontDistributionId"}
+            }
+          ]
+        },
+        "Cache": {
+          "Type": "S3",
+          "Location": {
+            "Fn::Sub": "s3://${S3BucketName}/cache"
+          }
+        }
+      }
+    },
+    "Pipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {"Ref": "CodePipelineName"},
+        "RoleArn": {"Fn::GetAtt": ["PipelineRole", "Arn"]},
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "Name": "Source",
+                "ActionTypeId": {"Category": "Source", "Owner": "AWS", "Provider": "S3", "Version": "1"},
+                "OutputArtifacts": [{"Name": "SourceArtifact"}],
+                "Configuration": {
+                  "S3Bucket": {"Ref": "S3BucketName"},
+                  "S3ObjectKey": "sam.yaml"
+                }
+              }
+            ]
+          },
+          {
+            "Name": "BuildAndDeploy",
+            "Actions": [
+              {
+                "Name": "BuildAndDeploy",
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "OutputArtifacts": [
+                  {"Name": "DeploymentPackage"}
+                ],
+                "InputArtifacts": [
+                  {"Name": "SourceArtifact"}
+                ],
+                "Configuration": {
+                  "ProjectName": {"Ref": "BuildProject"}
+                }
+              }
+            ]
+          }
+        ],
+        "PipelineType": "V2"
+      }
+    },
+    "DeploymentMetadata": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "cloudcafe-deployment-${AWS::StackName}"
+        },
+        "VersioningConfiguration": {
+          "Status": "Suspended"
+        },
+        "Tags": [
+          {"Key": "Application", "Value": "CloudCafe"},
+          {"Key": "Stage", "Value": {"Ref": "StageName"}},
+          {"Key": "Pipeline", "Value": {"Ref": "CodePipelineName"}}
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "PipelineArn": {
+      "Description": "CloudFormation stack ARN",
+      "Value": {"Fn::GetAtt": ["Pipeline", "Arn"]}
+    },
+    "BuildProjectArn": {
+      "Description": "CodeBuild project ARN",
+      "Value": {"Fn::GetAtt": ["BuildProject", "Arn"]}
+    },
+    "PipelineRoleArn": {
+      "Description": "CodePipeline execution role ARN",
+      "Value": {"Fn::GetAtt": ["PipelineRole", "Arn"]}
+    },
+    "S3Bucket": {
+      "Description": "Artifacts storage S3 bucket",
+      "Value": {"Ref": "S3BucketName"}
+    }
+  }
+}

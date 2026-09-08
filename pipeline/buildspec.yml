@@ -1,0 +1,49 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Installing dependencies and building Lambda package..."
+      - echo "Source commit hash: $CODEBUILD_SOURCE_VERSION"
+      - echo "Pull request number: $CODEBUILD_PR_NUMBER"
+      - npm install
+      - npm pack --silent
+      - echo "Installation and build completed successfully"
+  build:
+    commands:
+      - echo "Packaging Lambda deployment..."
+      - cp lambda.zip artifacts/lambda.zip
+      - cp sam.yaml artifacts/sam.yaml
+      - echo "Uploading to S3..."
+      - aws s3 cp artifacts/lambda.zip s3://cloudcafe-artifacts-${AWS_DEFAULT_REGION}/lambda.zip
+      - aws s3 cp artifacts/sam.yaml s3://cloudcafe-artifacts-${AWS_DEFAULT_REGION}/sam.yaml
+      - echo "Lambda package uploaded successfully"
+  post_build:
+    commands:
+      - echo "Creating and executing CloudFormation changeset..."
+      - echo "Validating SAM template..."
+      - sam validate --template-file sam.yaml
+      - echo "Packaging SAM template..."
+      - sam package --template-file sam.yaml --s3-bucket cloudcafe-artifacts-${AWS_DEFAULT_REGION} --output-template-file packaged.yaml
+      - echo "Creating CloudFormation stack deployment package..."
+      - aws cloudformation create-change-set --stack-name cloudcafe-${STAGE} --change-set-name CodeBuild-Changeset-${CODEBUILD_BUILD_ID} --template-body file://packaged.yaml --change-set-type CREATE --parameters ParameterKey=Stage,ParameterValue=${STAGE}
+      - echo "Awaiting changeset creation..."
+      - aws cloudformation wait changeset-create-complete --stack-name cloudcafe-${STAGE} --change-set-name CodeBuild-Changeset-${CODEBUILD_BUILD_ID}
+      - echo "Executing changeset..."
+      - aws cloudformation execute-change-set --stack-name cloudcafe-${STAGE} --change-set-name CodeBuild-Changeset-${CODEBUILD_BUILD_ID}
+      - echo "Waiting for deployment to complete..."
+      - aws cloudformation wait stack-update-complete --stack-name cloudcafe-${STAGE} || aws cloudformation wait stack-create-complete --stack-name cloudcafe-${STAGE}
+      - echo "Validating deployment..."
+      - aws cloudformation describe-stacks --stack-name cloudcafe-${STAGE} --query 'Stacks[0].StackStatus'
+      - echo "Deployment successful"
+      - echo "Invoking CloudFront cache invalidation..."
+      - aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} --paths "/" 2>/dev/null || echo "CloudFront invalidation skipped: Distribution ID not configured"
+      - echo "Build step completed successfully - Source commit: $CODEBUILD_SOURCE_VERSION - Pipeline ID: $CODEBUILD_BUILD_ID"
+
+artifacts:
+  type: zip
+  files: |
+    packaged.yaml
+  base-location: s3://cloudcafe-artifacts-${AWS_DEFAULT_REGION}/
+  location: cloudcafe-artifacts-${AWS_DEFAULT_REGION}/packaged.zip
+  discard-paths: yes

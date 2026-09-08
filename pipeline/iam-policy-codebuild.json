@@ -1,0 +1,143 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationStackUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:SignalResource",
+        "cloudformation:ValidateTemplate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFormationUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:UpdateStack",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DeleteChangeSet"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CodePipelineDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "codepipeline:UpdatePipeline",
+        "codepipeline:StartPipelineExecution",
+        "codepipeline:GetPipelineState",
+        "codepipeline:GetPipeline",
+        "codepipeline:PutWorkflowExecutionRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CodeBuildBuild",
+      "Effect": "Allow",
+      "Action": [
+        "codebuild:BatchGetBuilds",
+        "codebuild:StartBuild",
+        "codebuild:StopBuild",
+        "codebuild:CreateBuild",
+        "codebuild:CreateProject",
+        "codebuild:GetBuild"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CodeBuildProject",
+      "Effect": "Allow",
+      "Action": [
+        "codebuild:CreateProject",
+        "codebuild:UpdateProject",
+        "codebuild:DeleteProject"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3PutObject",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cloudcafe-artifacts-*",
+        "arn:aws:s3:::cloudcafe-artifacts-*/*",
+        "arn:aws:s3:::aws-cloud-cafe-*",
+        "arn:aws:s3:::aws-cloud-cafe-*/*"
+      ]
+    },
+    {
+      "Sid": "LambdaUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateAlias",
+        "lambda:PutFunctionConcurrency",
+        "lambda:ListFunctions",
+        "lambda:CreateFunction"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "APIGatewayManage",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:get-rest-apis",
+        "apigateway:vpce-link"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontInvalidation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:create-invalidation",
+        "cloudfront:get-invalidation",
+        "cloudfront:list-invalidation"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "KMSDecryptEncrypt",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:Encrypt",
+        "kms:ReEncrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:DescribeLogGroups",
+        "logs:GetLogEvents"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3Presign",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObjectAcl"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

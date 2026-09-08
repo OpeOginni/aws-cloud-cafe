@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CodePipelineGrantPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "codebuild.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "Type": "AWS::CodePipeline::Pipeline",
+  "Properties": {
+    "Name": "CloudCafeDeployPipeline",
+    "RoleArn": {"Fn::GetAtt": ["PipelineExecutionRole", "Arn"]},
+    "Stages": [
+      {
+        "Name": "Source",
+        "Actions": [
+          {
+            "Name": "SourceFromGitHub",
+            "ActionTypeId": {
+              "Category": "Source",
+              "Owner": "AWS",
+              "Provider": "S3",
+              "Version": "1"
+            },
+            "OutputArtifacts": [{"Name": "SourceArtifact"}],
+            "Configuration": {
+              "S3Bucket": "cloud-cafe-pipeline-artifacts",
+              "S3ObjectKey": "sam.yaml"
+            }
+          }
+        ]
+      },
+      {
+        "Name": "BuildDeploy",
+        "Actions": [
+          {
+            "Name": "CloudCafeDeploy",
+            "ActionTypeId": {
+              "Category": "Build",
+              "Owner": "AWS",
+              "Provider": "CodeBuild",
+              "Version": "1"
+            },
+            "OutputArtifacts": [{"Name": "DeploymentPackage"}],
+            "InputArtifacts": [{"Name": "SourceArtifact"}],
+            "Configuration": {
+              "ProjectName": {"Ref": "CloudCafeBuildProject"}
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
