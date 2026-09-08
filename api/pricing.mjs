@@ -22,6 +22,8 @@ export function quoteOrder(input) {
   });
   const subtotalCents = items.reduce((sum, item) => sum + item.lineCents, 0);
   const configuredFeeCents = fees[input.fulfillment];
+  // IMPORTANT: use ?? (nullish coalescing), NOT || (logical OR).
+  // pickup fee is 0, which is falsy; || would incorrectly fall back to 490.
   const feeCents = configuredFeeCents ?? 490;
   return { items, fulfillment: input.fulfillment, subtotalCents, configuredFeeCents, feeCents, totalCents: subtotalCents + feeCents, currency: 'EUR' };
 }

@@ -20,6 +20,14 @@ test('delivery uses server-side prices and integer cents', () => {
   assert.equal(quote.totalCents, 1330);
 });
 
+test('pickup fee is zero, not the delivery fallback', () => {
+  const quote = quoteOrder({ fulfillment: 'pickup', items: [{ id: 'flat-white', quantity: 2 }] });
+  assert.equal(quote.subtotalCents, 840);
+  assert.equal(quote.configuredFeeCents, 0);
+  assert.equal(quote.feeCents, 0, 'pickup fee must be 0, not the delivery fallback (|| vs ?? bug)');
+  assert.equal(quote.totalCents, 840);
+});
+
 test('invalid orders are rejected', () => {
   for (const input of [null, {}, { fulfillment: 'toString', items: [{}] }, { fulfillment: 'pickup', items: [] },
     { fulfillment: 'pickup', items: [{ id: 'cookie', quantity: -1 }] },
