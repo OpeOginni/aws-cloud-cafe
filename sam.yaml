@@ -1,0 +1,291 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+  S3BucketArtifact:
+    Type: String
+    Description: Explicit S3 bucket for deployment artifacts
+  CloudFrontDistributionId:
+    Type: String
+    Description: Custom CloudFront distribution ID
+  LambdaTimeout:
+    Type: Number
+    Default: 5
+  LambdaMemory:
+    Type: Number
+    Default: 256
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: !Ref LambdaTimeout
+    MemorySize: !Ref LambdaMemory
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        REGION: !Ref AWS::Region
+    Logging:
+      Level: INFO
+      Format: JSON
+    Tags:
+      Stage: !Ref Stage
+      Application: CloudCafe
+
+Resources:
+  ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+        - Key: Application
+          Value: CloudCafe
+
+  PricingLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: ./lambda
+      Role: !GetAtt ServiceRole.Arn
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+        - Key: Application
+          Value: CloudCafe
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+          REGION: !Ref AWS::Region
+
+  PrintHeadersMiddleware:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: middleware.handler
+      CodeUri: ./lambda
+      Role: !GetAtt ServiceRole.Arn
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+          Key: Application
+          Value: CloudCafe
+
+  MenuS3:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'cloudcafe-menu-${Stage}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      SecureTransportConfiguration:
+        BlockEncryption: true
+      ObjectOwnership: BucketOwnerPreferred
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+        - Key: Application
+          Value: CloudCafe
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  MenuS3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${Stage}-MenuS3-Access'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              -s3:GetObject
+            Resource: !Sub '${MenuS3.Arn}/*'
+      Roles:
+        - !Ref ServiceRole
+
+  PrerequisiteExecutionRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${Stage}-Prerequisites'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${PricingLambda}:*'
+      Roles:
+        - !Ref ServiceRole
+
+  APIGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub 'CloudCafe-${Stage}'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+        AllowCredentials: true
+      StageName: !Ref Stage
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+        - Key: Application
+          Value: CloudCafe
+
+  MenuIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PricingLambda.Arn}/invocations
+      PayloadFormatVersion: '2.0'
+
+  MenuRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: GET /api/menu
+      AuthorizationType: NONE
+      Target: !Join
+        - ''
+        - - integrations/
+          - !Ref MenuIntegration
+
+  QuoteIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PricingLambda.Arn}/invocations
+      PayloadFormatVersion: '2.0'
+
+  QuoteRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: POST /api/quote
+      AuthorizationType: NONE
+      Target: !Join
+        - ''
+        - - integrations/
+          - !Ref QuoteIntegration
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          TargetOriginId: MenuS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !GetAtt PrintHeadersMiddleware.Arn
+              IncludeBody: false
+          DefaultTTL: 0
+          MinTTL: 0
+          MaxTTL: 0
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        Enabled: true
+        PriceClass: PriceClass_100
+        WebACLId: !Ref CloudFrontDistributionId
+        Origins:
+          - DomainName: !GetAtt MenuS3.RegionalDomainName
+            Id: MenuS3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            CustomHeaders:
+              - HeaderName: X-Stage
+                HeaderValue: !Ref Stage
+              - HeaderName: X-Application
+                HeaderValue: CloudCafe
+              - HeaderName: X-Session-Id
+                HeaderValue: !Ref APIGateway
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 500
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+      Tags:
+        - Key: Stage
+          Value: !Ref Stage
+        - Key: Application
+          Value: CloudCafe
+
+  LogGroupPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${Stage}-LogAccess'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: logs:CreateLogGroup
+            Resource: '*'
+      Roles:
+        - !Ref ServiceRole
+
+  BuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Build role for SAM deployment
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3Read
+            Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:List*
+            Resource: !Sub 'arn:aws:s3:::${S3BucketArtifact}/*'
+    ManagedPolicyName: !Sub '${Stage}-build'

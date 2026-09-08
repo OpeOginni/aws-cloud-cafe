@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f6f2">
+  <title>Cloud Café — Good coffee. Great company.</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"> ☁ <span>cloud café<span class="brand-dot">.</span></span></a>
+    <span class="location">FRANKFURT AM MAIN <span>↗</span></span>
+    <span class="tag"><i></i> The meetup edition</span>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">SMALL BATCH COFFEE / GOOD COMPANY</p>
+        <h1>Good coffee.<br>Great <span>company.</span></h1>
+        <p class="intro">Fuel your next big idea. Specialty drinks and little treats for the people building what’s next.</p>
+        <div class="hero-tags">
+          <span>↗ Brewed in Frankfurt</span>
+          <span>♡ Oat milk, always included</span>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="art-label">FRESHLY BREWED</div>
+        <div class="coffee">
+          <span>☁</span><b>cloud<br>café.</b>
+        </div>
+        <div class="art-note">a little coffee.<br>a little conversation.</div>
+        <span class="spark">✳</span>
+      </div>
+    </section>
+    <div class="shop-layout">
+      <section>
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">THE GOOD STUFF</p>
+            <h2>Choose your fuel</h2>
+          </div>
+          <span class="muted">04 favorites / made with care</span>
+        </div>
+        <div id="menu" class="menu-grid" aria-live="polite">
+          <p>Warming up the coffee bar…</p>
+        </div>
+        <div class="meetup-note">
+          <span>✳</span>
+          <div><strong>Better together.</strong><p>Grab a round for your meetup crew. All prices include VAT. Demo orders only — no payment, no personal data.</p></div>
+        </div>
+      </section>
+      <aside class="order">
+        <div class="order-heading">
+          <h2>Your coffee run</h2>
+          <span id="count" class="count">2</span>
+        </div>
+        <p class="muted">A little something to keep you shipping.</p>
+        <div id="cart"></div>
+        <fieldset>
+          <legend>How are you getting it?</legend>
+          <div class="fulfillment">
+            <label><input type="radio" name="fulfillment" value="pickup" checked><span>↗ Pick up<small>At the meetup · Free</small></span></label>
+            <label><input type="radio" name="fulfillment" value="delivery"><span>⌁ Delivery<small>To your office · €4.90</small></span></label>
+          </div>
+        </fieldset>
+        <div class="totals">
+          <div><span>Subtotal</span><span id="subtotal">—</span></div>
+          <div><span>Fulfillment fee</span><span id="fee">—</span></div>
+          <div class="grand-total"><span>Total</span><span id="total">—</span></div>
+        </div>
+        <button id="confirm" class="primary" disabled>Confirm demo coffee run <span>↗</span></button>
+        <p id="status" class="status" role="status">Connecting to the coffee bar…</p>
+        <details class="receipt">
+          <summary>Behind this order <span>⌘</span></summary>
+          <p>Calculated by the coffee bar server.</p>
+          <dl>
+            <dt>Request ID</dt>
+            <dd id="request">—</dd>
+          </dl>
+          <button id="copy" class="copy">Copy support details</button>
+        </details>
+      </aside>
+    </div>
+    <section class="architecture">
+      <div>
+        <p class="eyebrow">YOUR NEXT COFFEE BREAK</p>
+        <h3>A little ritual. A better day.</h3>
+      </div>
+      <div class="service">
+        <b>01 / Choose your favorites</b><span>Specialty coffee and small treats</span>
+      </div>
+      <div class="service">
+        <b>02 / Bring your crew</b><span>A round for the people you build with</span>
+      </div>
+      <div class="service">
+        <b>03 / Make it a meetup</b><span>Free pickup or office delivery</span>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <a class="brand" href="/"> ☁ cloud café.</a>
+    <span>A GitTerm demo · AWS User Group Frankfurt</span>
+    <span>Code → Coffee → Repeat</span>
+  </footer>
+</body>
+</html>
