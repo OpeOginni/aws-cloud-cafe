@@ -13,12 +13,14 @@ const assets = {
 export function createApp() {
   return createServer(async (req, res) => {
     const requestId = randomUUID();
+    const commit = process.env.GIT_COMMIT || 'local';
     const json = (status, data) => {
       res.writeHead(status, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
         'x-request-id': requestId,
-      }).end(JSON.stringify({ ...data, requestId }));
+        'x-commit': commit,
+      }).end(JSON.stringify({ ...data, requestId, commit }));
     };
     try {
       const path = new URL(req.url, 'http://localhost').pathname;

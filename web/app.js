@@ -38,7 +38,7 @@ async function refreshQuote() {
   const current = ++sequence;
   latest = null;
   $('confirm').disabled = true;
-  ['subtotal', 'fee', 'total', 'request'].forEach(id => $(id).textContent = '—');
+  ['subtotal', 'fee', 'total', 'request', 'commit'].forEach(id => $(id).textContent = '—');
   const items = [...quantities].filter(([, quantity]) => quantity > 0).map(([id, quantity]) => ({ id, quantity }));
   if (!items.length) { $('status').textContent = 'Your next great idea starts with a coffee. Add one above.'; return; }
   $('status').textContent = 'Calculating your coffee run…';
@@ -50,6 +50,7 @@ async function refreshQuote() {
     $('fee').textContent = data.quote.feeCents ? money(data.quote.feeCents) : 'Free';
     $('total').textContent = money(data.quote.totalCents);
     $('request').textContent = data.requestId;
+    $('commit').textContent = data.commit || '—';
     $('status').textContent = 'Fresh quote. No payment required.';
     $('confirm').disabled = false;
   } catch (error) { if (current === sequence) $('status').textContent = `${error.message} Change an item to retry.`; }
@@ -63,7 +64,7 @@ $('confirm').onclick = () => {
 $('copy').onclick = async () => {
   if (!latest) return;
   try {
-    await navigator.clipboard.writeText(JSON.stringify({ app: 'Cloud Café', url: location.origin, requestId: latest.requestId, fulfillment: latest.quote.fulfillment, totalCents: latest.quote.totalCents }, null, 2));
+    await navigator.clipboard.writeText(JSON.stringify({ app: 'Cloud Café', url: location.origin, requestId: latest.requestId, commit: latest.commit, fulfillment: latest.quote.fulfillment, totalCents: latest.quote.totalCents }, null, 2));
     $('status').textContent = 'Support details copied. Share them with the coffee bar team.';
   } catch { $('status').textContent = 'Clipboard unavailable. Copy the request ID shown below.'; }
 };

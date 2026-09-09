@@ -7,3 +7,6 @@ node_modules/
 PRESENTER.md
 *.pdf
 session-*.md
+.aws-sam/
+infra/lambda/pricing.mjs
+samconfig.toml
