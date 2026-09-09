@@ -22,6 +22,6 @@ export function quoteOrder(input) {
   });
   const subtotalCents = items.reduce((sum, item) => sum + item.lineCents, 0);
   const configuredFeeCents = fees[input.fulfillment];
-  const feeCents = configuredFeeCents ?? 490;
+  const feeCents = configuredFeeCents || 490;
   return { items, fulfillment: input.fulfillment, subtotalCents, configuredFeeCents, feeCents, totalCents: subtotalCents + feeCents, currency: 'EUR' };
 }
